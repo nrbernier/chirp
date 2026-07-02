@@ -61,6 +61,9 @@ canvas {
   border-radius: 10px;
   background: #0a0d13;
   box-shadow: 0 0 0 1px #1e2836;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 #overlay {
@@ -105,6 +108,36 @@ canvas {
   width: 0%;
   background: var(--goal);
   transition: width 80ms linear;
+}
+
+#touchControls {
+  display: none;
+  width: 100%;
+  gap: 0.6rem;
+}
+
+.tbtn {
+  flex: 1;
+  font: inherit;
+  font-size: 1rem;
+  padding: 0.55rem 0;
+  border-radius: 8px;
+  border: 1px solid #2a3648;
+  background: var(--panel);
+  color: var(--text);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.tbtn:active { background: #1e2836; }
+
+.touchOnly { display: none; }
+
+@media (hover: none), (pointer: coarse) {
+  #touchControls { display: flex; }
+  .touchOnly { display: inline; }
+  .keysOnly { display: none; }
 }
 
 #hint {

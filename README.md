@@ -30,6 +30,10 @@ python3 -m http.server
 | R | restart the level (new random target) |
 | N / Enter | next level after a match |
 
+On a phone or tablet, drag anywhere on the map to steer (a virtual joystick
+appears under your finger), and use the on-screen buttons for peek, restart
+and next.
+
 ## Levels
 
 1. **Tutorial** — one target, map visible.
