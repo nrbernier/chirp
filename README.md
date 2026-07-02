@@ -1,5 +1,7 @@
 # Chirp — navigate by sound
 
+**[Play it here](https://nrbernier.github.io/chirp/)**
+
 A game where you navigate purely with your ears. The playing field is a 2D
 *sound image*: **left–right is the stereo position, up–down is pitch**
 (200–800 Hz, exponential, so vertical distance is musical interval).
