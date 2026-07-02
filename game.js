@@ -197,6 +197,8 @@ function frame(nowMs) {
     if (state.keys.ArrowRight || state.keys.KeyD) dx += 1;
     if (state.keys.ArrowUp || state.keys.KeyW) dy += 1;
     if (state.keys.ArrowDown || state.keys.KeyS) dy -= 1;
+    dx = Math.max(-1, Math.min(1, dx + stick.vx));
+    dy = Math.max(-1, Math.min(1, dy + stick.vy));
     state.player.x = Math.min(1, Math.max(0, state.player.x + dx * MOVE_SPEED * dt));
     state.player.y = Math.min(1, Math.max(0, state.player.y + dy * MOVE_SPEED * dt));
 
@@ -263,6 +265,7 @@ function render() {
     cx2d.beginPath();
     cx2d.arc(W / 2, H / 2 + 30, pulse + 14, 0, Math.PI * 2);
     cx2d.stroke();
+    drawStick();
     return;
   }
 
@@ -293,6 +296,24 @@ function render() {
   cx2d.fillText('pitch ▲', 0, 0);
   cx2d.restore();
 
+  cx2d.restore();
+  drawStick();
+}
+
+// The touch joystick: a ring at the drag origin, a dot under the finger.
+function drawStick() {
+  if (stick.id === null) return;
+  cx2d.save();
+  cx2d.globalAlpha = 0.4;
+  cx2d.strokeStyle = '#cdd6e4';
+  cx2d.lineWidth = 2;
+  cx2d.beginPath();
+  cx2d.arc(stick.ox, stick.oy, STICK_RADIUS, 0, Math.PI * 2);
+  cx2d.stroke();
+  cx2d.fillStyle = '#cdd6e4';
+  cx2d.beginPath();
+  cx2d.arc(stick.sx, stick.sy, 10, 0, Math.PI * 2);
+  cx2d.fill();
   cx2d.restore();
 }
 
@@ -327,23 +348,81 @@ const GAME_KEYS = new Set([
   'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyH', 'KeyR', 'KeyN', 'Enter',
 ]);
 
+function actionPeek() {
+  if (state.screen === 'playing') state.peek = PEEK_TIME;
+}
+function actionRestart() {
+  if (state.screen === 'playing' || state.screen === 'won') setupLevel(state.levelIndex);
+}
+function actionNext() {
+  if (state.screen === 'won') setupLevel(state.levelIndex + 1);
+  else if (state.screen === 'finished') setupLevel(0);
+}
+
 window.addEventListener('keydown', e => {
   if (!GAME_KEYS.has(e.code)) return;
   e.preventDefault();
   state.keys[e.code] = true;
 
-  if (e.code === 'KeyH' && state.screen === 'playing') state.peek = PEEK_TIME;
-  if (e.code === 'KeyR' && (state.screen === 'playing' || state.screen === 'won'))
-    setupLevel(state.levelIndex);
-  if ((e.code === 'KeyN' || e.code === 'Enter')) {
-    if (state.screen === 'won') setupLevel(state.levelIndex + 1);
-    else if (state.screen === 'finished') setupLevel(0);
-  }
+  if (e.code === 'KeyH') actionPeek();
+  if (e.code === 'KeyR') actionRestart();
+  if (e.code === 'KeyN' || e.code === 'Enter') actionNext();
 });
 
 window.addEventListener('keyup', e => {
   if (GAME_KEYS.has(e.code)) state.keys[e.code] = false;
 });
+
+// Touch: dragging on the map is a virtual joystick. The ring is centred on
+// the drag origin and trails the finger when it strays past the stick's
+// radius, so reversing direction never needs a long drag back.
+
+const STICK_RADIUS = 55; // canvas px
+const stick = { id: null, ox: 0, oy: 0, sx: 0, sy: 0, vx: 0, vy: 0 };
+
+function canvasPos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (stick.id !== null || state.screen === 'title') return;
+  e.preventDefault();
+  const p = canvasPos(e);
+  stick.id = e.pointerId;
+  stick.ox = p.x; stick.oy = p.y;
+  stick.sx = p.x; stick.sy = p.y;
+  stick.vx = 0; stick.vy = 0;
+  canvas.setPointerCapture(e.pointerId);
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerId !== stick.id) return;
+  const p = canvasPos(e);
+  let dx = p.x - stick.ox, dy = p.y - stick.oy;
+  const len = Math.hypot(dx, dy);
+  if (len > STICK_RADIUS) {
+    stick.ox = p.x - (dx / len) * STICK_RADIUS;
+    stick.oy = p.y - (dy / len) * STICK_RADIUS;
+    dx = (dx / len) * STICK_RADIUS;
+    dy = (dy / len) * STICK_RADIUS;
+  }
+  stick.sx = p.x; stick.sy = p.y;
+  stick.vx = dx / STICK_RADIUS;
+  stick.vy = -dy / STICK_RADIUS; // screen y grows downward, pitch grows upward
+});
+
+function endStick(e) {
+  if (e.pointerId !== stick.id) return;
+  stick.id = null;
+  stick.vx = 0; stick.vy = 0;
+}
+canvas.addEventListener('pointerup', endStick);
+canvas.addEventListener('pointercancel', endStick);
+
+document.getElementById('peekBtn').addEventListener('click', actionPeek);
+document.getElementById('restartBtn').addEventListener('click', actionRestart);
+document.getElementById('nextBtn').addEventListener('click', actionNext);
 
 document.getElementById('vol').addEventListener('input', e => {
   AudioEngine.setVolume(parseFloat(e.target.value));
