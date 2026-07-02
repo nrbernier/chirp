@@ -1,0 +1,143 @@
+:root {
+  --bg: #0d1017;
+  --panel: #141a24;
+  --text: #cdd6e4;
+  --dim: #6b7688;
+  --player: #ff9f43;
+  --target: #4cc9f0;
+  --goal: #7bd88f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+
+main {
+  width: min(560px, 96vw);
+  padding: 1.2rem 0 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+header {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--player);
+}
+
+#levelName {
+  color: var(--dim);
+  font-size: 0.95rem;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  background: #0a0d13;
+  box-shadow: 0 0 0 1px #1e2836;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: rgba(10, 13, 19, 0.88);
+  border-radius: 10px;
+}
+
+#overlay.hidden { display: none; }
+
+#overlay p { color: var(--dim); margin: 0; }
+
+#startBtn {
+  font: inherit;
+  font-size: 1.2rem;
+  padding: 0.7rem 2.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--player);
+  background: transparent;
+  color: var(--player);
+  cursor: pointer;
+}
+
+#startBtn:hover { background: rgba(255, 159, 67, 0.12); }
+
+#lockwrap {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #1a2230;
+  overflow: hidden;
+}
+
+#lockbar {
+  height: 100%;
+  width: 0%;
+  background: var(--goal);
+  transition: width 80ms linear;
+}
+
+#hint {
+  margin: 0;
+  min-height: 2.6em;
+  text-align: center;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+#status {
+  margin: 0;
+  min-height: 1.3em;
+  text-align: center;
+  color: var(--goal);
+  font-weight: 600;
+}
+
+footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  color: var(--dim);
+  font-size: 0.85rem;
+}
+
+kbd {
+  background: #1a2230;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: inherit;
+}
+
+input[type="range"] { vertical-align: middle; width: 90px; }
