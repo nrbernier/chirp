@@ -6,8 +6,8 @@ A game where you navigate purely with your ears. The playing field is a 2D
 *sound image*: **left–right is the stereo position, up–down is pitch**
 (200–800 Hz, exponential, so vertical distance is musical interval).
 
-You are a **buzzy sawtooth chirp** that sweeps *up* into its pitch. Targets are
-**soft bell chirps** that sweep *down*. They take turns in a steady sequence —
+You are a **buzzy sawtooth chirp**; targets are **soft bell chirps**. Both glide
+the same way into their pitch, so only the tone differs. They take turns in a steady sequence —
 compare them and steer with the arrow keys until they match. Hold the match
 briefly to lock in (the green bar shows lock progress, and your chirp gains a
 sparkle when you're on the spot).

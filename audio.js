@@ -52,39 +52,47 @@ const AudioEngine = (() => {
     return pan;
   }
 
-  // The player's voice: a buzzy sawtooth chirp that sweeps UP into its pitch.
+  // Both voices share the same pitch contour: a quick glide DOWN from
+  // SWEEP_FROM × f into f, so the only difference is timbre — the ear
+  // compares like with like and pitch matching is fair.
+  const SWEEP_FROM = 1.3;
+  const SWEEP_TIME = 0.09;
+
+  // The player's voice: a buzzy filtered sawtooth chirp.
   function playerChirp(x, y, when, locked) {
     const f = freqOf(y);
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(f * 0.7, when);
-    osc.frequency.exponentialRampToValueAtTime(f, when + 0.06);
+    osc.frequency.setValueAtTime(f * SWEEP_FROM, when);
+    osc.frequency.exponentialRampToValueAtTime(f, when + SWEEP_TIME);
 
+    // Filter tracks the glide so the brightness stays constant.
     const filt = ctx.createBiquadFilter();
     filt.type = 'lowpass';
-    filt.frequency.setValueAtTime(f * 3, when);
+    filt.frequency.setValueAtTime(f * SWEEP_FROM * 3, when);
+    filt.frequency.exponentialRampToValueAtTime(f * 3, when + SWEEP_TIME);
     filt.Q.value = 1.5;
 
-    const g = env(when, 0.22, 0.01, 0.3);
+    const g = env(when, 0.22, 0.008, 0.45);
     osc.connect(filt);
     filt.connect(g);
     g.connect(out(x));
     osc.start(when);
-    osc.stop(when + 0.35);
+    osc.stop(when + 0.5);
 
     // Sparkle when locked onto the goal, so the player hears the match take.
     if (locked) ting(x, Math.min(f * 4, 3200), when + 0.1);
   }
 
-  // A target's voice: a soft bell that sweeps DOWN into its pitch.
+  // A target's voice: a soft sine bell with a faint upper partial.
   function targetChirp(x, y, when) {
     const f = freqOf(y);
     const dest = out(x);
 
     const o1 = ctx.createOscillator();
     o1.type = 'sine';
-    o1.frequency.setValueAtTime(f * 1.3, when);
-    o1.frequency.exponentialRampToValueAtTime(f, when + 0.09);
+    o1.frequency.setValueAtTime(f * SWEEP_FROM, when);
+    o1.frequency.exponentialRampToValueAtTime(f, when + SWEEP_TIME);
     const g1 = env(when, 0.3, 0.008, 0.45);
     o1.connect(g1);
     g1.connect(dest);
@@ -94,8 +102,8 @@ const AudioEngine = (() => {
     // Faint upper partial gives the bell its shimmer.
     const o2 = ctx.createOscillator();
     o2.type = 'sine';
-    o2.frequency.setValueAtTime(f * 2.6, when);
-    o2.frequency.exponentialRampToValueAtTime(f * 2, when + 0.09);
+    o2.frequency.setValueAtTime(f * 2 * SWEEP_FROM, when);
+    o2.frequency.exponentialRampToValueAtTime(f * 2, when + SWEEP_TIME);
     const g2 = env(when, 0.06, 0.008, 0.25);
     o2.connect(g2);
     g2.connect(dest);
