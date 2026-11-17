@@ -9,6 +9,12 @@ const AudioEngine = (() => {
   const FMIN = 200;
   const FMAX = 800;
 
+  // Interaural time difference: besides level panning, the far ear hears the
+  // sound up to ITD_MAX seconds later, which sharpens left–right on
+  // headphones. Set USE_ITD to false to compare.
+  const USE_ITD = true;
+  const ITD_MAX = 0.0006;
+
   let ctx = null;
   let master = null;
   let padGain = null;
@@ -16,15 +22,38 @@ const AudioEngine = (() => {
 
   function ensure() {
     if (ctx) return;
+    // On iOS, Web Audio follows the ringer switch unless the session is
+    // declared as playback (Safari 17+).
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    } catch (e) { /* not supported */ }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain();
     master.gain.value = 0.8;
-    master.connect(ctx.destination);
+    // Gentle limiter so chirps, pad and jingle never clip when they overlap.
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -6;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 6;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.2;
+    master.connect(limiter);
+    limiter.connect(ctx.destination);
   }
 
   async function start() {
     ensure();
     await ctx.resume();
+  }
+
+  // Resume after an interruption (call, app switch, screen lock). Safe to
+  // call from any user gesture; a no-op when already running.
+  function resume() {
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+  }
+
+  function suspend() {
+    if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {});
   }
 
   const now = () => (ctx ? ctx.currentTime : 0);
@@ -45,12 +74,40 @@ const AudioEngine = (() => {
     return g;
   }
 
-  function out(x) {
+  // A spatialiser at position x: equal-power pan plus an interaural delay.
+  // Returns the input node and a setter for moving it smoothly.
+  function spatial(x) {
     const pan = ctx.createStereoPanner();
-    pan.pan.value = panOf(x);
-    pan.connect(master);
-    return pan;
+    let dl = null, dr = null;
+    if (USE_ITD) {
+      const split = ctx.createChannelSplitter(2);
+      const merge = ctx.createChannelMerger(2);
+      dl = ctx.createDelay(0.01);
+      dr = ctx.createDelay(0.01);
+      pan.connect(split);
+      split.connect(dl, 0);
+      split.connect(dr, 1);
+      dl.connect(merge, 0, 0);
+      dr.connect(merge, 0, 1);
+      merge.connect(master);
+    } else {
+      pan.connect(master);
+    }
+    const apply = (xx, smooth) => {
+      const p = panOf(xx);
+      const vals = [[pan.pan, p]];
+      if (dl) vals.push([dl.delayTime, p > 0 ? p * ITD_MAX : 0],
+                        [dr.delayTime, p < 0 ? -p * ITD_MAX : 0]);
+      for (const [param, v] of vals) {
+        if (smooth) param.setTargetAtTime(v, now(), 0.03);
+        else param.value = v;
+      }
+    };
+    apply(x, false);
+    return { input: pan, set: xx => apply(xx, true) };
   }
+
+  const out = x => spatial(x).input;
 
   // Both voices share the same pitch contour: a quick glide DOWN from
   // SWEEP_FROM × f into f, so the only difference is timbre — the ear
@@ -111,6 +168,49 @@ const AudioEngine = (() => {
     o2.stop(when + 0.3);
   }
 
+  // A sustained, glide-free tone for the beating level. Returns a handle
+  // whose set(x, y) moves the voice smoothly while it sounds, so two of them
+  // played together beat audibly as their pitches converge.
+  // voice: 'bell' (pure sine) or 'player' (softly filtered triangle).
+  function sustain(x, y, when, dur, voice) {
+    const sp = spatial(x);
+    const osc = ctx.createOscillator();
+    osc.frequency.value = freqOf(y);
+    const g = ctx.createGain();
+    const peak = voice === 'bell' ? 0.16 : 0.12;
+    const fade = 0.12;
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(peak, when + fade);
+    g.gain.setValueAtTime(peak, when + dur - fade);
+    g.gain.linearRampToValueAtTime(0, when + dur);
+
+    let filt = null;
+    if (voice === 'bell') {
+      osc.type = 'sine';
+      osc.connect(g);
+    } else {
+      osc.type = 'triangle';
+      filt = ctx.createBiquadFilter();
+      filt.type = 'lowpass';
+      filt.frequency.value = freqOf(y) * 2.5;
+      osc.connect(filt);
+      filt.connect(g);
+    }
+    g.connect(sp.input);
+    osc.start(when);
+    osc.stop(when + dur + 0.05);
+
+    return {
+      end: when + dur,
+      set(xx, yy) {
+        const f = freqOf(yy);
+        osc.frequency.setTargetAtTime(f, now(), 0.02);
+        if (filt) filt.frequency.setTargetAtTime(f * 2.5, now(), 0.02);
+        sp.set(xx);
+      },
+    };
+  }
+
   function ting(x, f, when) {
     const o = ctx.createOscillator();
     o.type = 'sine';
@@ -133,9 +233,23 @@ const AudioEngine = (() => {
     o.stop(when + dur + 0.1);
   }
 
-  // Level-complete arpeggio rooted on the goal pitch.
-  function jingle(f) {
-    const t = now() + 0.05;
+  // A short low thud when the player pushes against the edge of the field.
+  function bump(x) {
+    const when = now() + 0.01;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(140, when);
+    o.frequency.exponentialRampToValueAtTime(55, when + 0.12);
+    const g = env(when, 0.35, 0.004, 0.16);
+    o.connect(g);
+    g.connect(out(x));
+    o.start(when);
+    o.stop(when + 0.2);
+  }
+
+  // Level-complete arpeggio rooted on the goal pitch, optionally delayed.
+  function jingle(f, delay = 0) {
+    const t = now() + 0.05 + delay;
     [1, 5 / 4, 3 / 2, 2].forEach((r, i) =>
       pluck(f * r, t + i * 0.13, 0.5, 0.18, 0.6, 'triangle'));
     pluck(f * 2, t + 4 * 0.13, 0.5, 0.15, 1.2, 'sine');
@@ -183,8 +297,9 @@ const AudioEngine = (() => {
 
   return {
     FMIN, FMAX,
-    start, now, freqOf, yOfFreq, panOf, setVolume,
-    playerChirp, targetChirp, pluck, jingle, startPad, stopPad,
+    start, resume, suspend, now, freqOf, yOfFreq, panOf, setVolume,
+    playerChirp, targetChirp, sustain, pluck, ting, bump, jingle,
+    startPad, stopPad,
     get ready() { return !!ctx; },
   };
 })();

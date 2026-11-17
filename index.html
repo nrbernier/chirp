@@ -23,10 +23,14 @@
   </header>
 
   <div id="stage">
-    <canvas id="canvas" width="520" height="520"></canvas>
+    <canvas id="canvas" width="520" height="520" role="img"
+      aria-label="Sound map: left–right is stereo position, up–down is pitch. Usually dark — play by ear and peek for a spoken description."></canvas>
     <div id="overlay">
       <button id="startBtn">▶ start</button>
+      <div id="levelPicker" role="group" aria-label="Choose a level"></div>
+      <button id="endlessBtn" hidden>∞ endless</button>
       <p>headphones strongly recommended</p>
+      <p class="touchOnly small">No sound? Check the silent switch.</p>
     </div>
   </div>
 
@@ -36,21 +40,29 @@
     <button class="tbtn" id="peekBtn">👁 peek</button>
     <button class="tbtn" id="restartBtn">↺ restart</button>
     <button class="tbtn" id="nextBtn">▶ next</button>
+    <button class="tbtn" id="menuBtn" aria-label="menu">☰</button>
   </div>
 
-  <p id="hint">…</p>
-  <p id="status"></p>
+  <p id="hint" aria-live="polite">…</p>
+  <p id="status" aria-live="assertive"></p>
+  <p id="sr" class="sr-only" aria-live="polite"></p>
 
   <footer>
     <span class="keysOnly"><kbd>←↑↓→</kbd> move</span>
     <span class="keysOnly"><kbd>H</kbd> peek</span>
     <span class="keysOnly"><kbd>R</kbd> restart</span>
     <span class="keysOnly"><kbd>N</kbd> next</span>
+    <span class="keysOnly"><kbd>Esc</kbd> menu</span>
     <span class="touchOnly">drag the map to move</span>
     <label>vol <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8"></label>
   </footer>
 </main>
 <script src="audio.js"></script>
 <script src="game.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+</script>
 </body>
 </html>
